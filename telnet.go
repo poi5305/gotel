@@ -281,10 +281,7 @@ func (t *GoTel) subCommand(code byte, content []byte) {
     if t.Config.CSubCmdListeners != nil {
         listener, ok := t.Config.CSubCmdListeners[code]
         if ok {
-            success := listener(t, code, content)
-            if success {
-                return
-            } 
+            listener(t, code, content)
         }
     }
 }
