@@ -71,13 +71,13 @@ type TelConfig struct {
     CReadBuffer int
     CLogLevel LogLevel
     CTerminalType string
-    CDoToWillCmdList map[byte] func(byte) bool
-    CWillToDoCmdList map[byte] func(byte) bool
-    CSubCmdListeners map[byte] func(byte, []byte) bool
+    CDoToWillCmdList map[byte] func(*GoTel, byte) bool
+    CWillToDoCmdList map[byte] func(*GoTel, byte) bool
+    CSubCmdListeners map[byte] func(*GoTel, byte, []byte) bool
 }
 
 // RegisterSubCmdListener Register sub command listener
-func (t *TelConfig) RegisterSubCmdListener(code byte, listener func(byte, []byte) bool) {
+func (t *TelConfig) RegisterSubCmdListener(code byte, listener func(*GoTel, byte, []byte) bool) {
     t.CSubCmdListeners[code] = listener
 }
 
@@ -120,20 +120,20 @@ func (t *GoTel) UseDefaultConfig() {
     t.Config.CLogLevel = LogDebug
     t.Config.CTerminalType = "VT100"
     
-    t.Config.CDoToWillCmdList = make(map[byte] func(byte) bool)
-    t.Config.CWillToDoCmdList = make(map[byte] func(byte) bool)
-    t.Config.CSubCmdListeners = make(map[byte] func(byte, []byte) bool)
+    t.Config.CDoToWillCmdList = make(map[byte] func(*GoTel, byte) bool)
+    t.Config.CWillToDoCmdList = make(map[byte] func(*GoTel, byte) bool)
+    t.Config.CSubCmdListeners = make(map[byte] func(*GoTel, byte, []byte) bool)
     
     t.Config.CWillToDoCmdList[ECHO] = nil
     t.Config.CWillToDoCmdList[SGA] = nil
     t.Config.CDoToWillCmdList[TT] = nil
     t.Config.CDoToWillCmdList[WS] = nil // TODO check window size
     
-    t.Config.RegisterSubCmdListener(TT, func(byte, []byte) bool {
+    t.Config.RegisterSubCmdListener(TT, func(g *GoTel, code byte, content []byte) bool {
         cmd := []byte {IAC, SB, TT, IS}
-        cmd = append(cmd, t.Config.CTerminalType...)
+        cmd = append(cmd, g.Config.CTerminalType...)
         cmd = append(cmd, IAC, SB)
-        t.SendCommand(cmd...)
+        g.SendCommand(cmd...)
         return true
     })
 }
@@ -234,7 +234,7 @@ func (t *GoTel) inStateWill(b byte) telState {
     if t.Config.CWillToDoCmdList != nil {
         do, ok := t.Config.CWillToDoCmdList[b]
         if ok {
-            if do == nil || do(b) {
+            if do == nil || do(t, b) {
                 t.SendCommand(IAC, DO, b)
                 return stateData
             }
@@ -248,7 +248,7 @@ func (t *GoTel) inStateDo(b byte) telState {
     if t.Config.CDoToWillCmdList != nil {
         do, ok := t.Config.CDoToWillCmdList[b]
         if ok {
-            if do == nil || do(b) {
+            if do == nil || do(t, b) {
                 t.SendCommand(IAC, WILL, b)
                 return stateData
             }
@@ -270,7 +270,7 @@ func (t *GoTel) subCommand(code byte, content []byte) {
     if t.Config.CSubCmdListeners != nil {
         listener, ok := t.Config.CSubCmdListeners[code]
         if ok {
-            success := listener(code, content)
+            success := listener(t, code, content)
             if success {
                 return
             } 
