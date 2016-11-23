@@ -88,6 +88,41 @@ func (t *TelConfig) UnregisterSubCmdListener(code byte) {
     delete(t.CSubCmdListeners, code)
 }
 
+// GetGoTelDefaultConfig comment
+func GetGoTelDefaultConfig() TelConfig {
+    c := TelConfig{}
+    c.CReadBuffer = 1024
+    c.CLogLevel = LogDebug
+    c.CTerminalType = "VT100"
+    c.CWindowCols = 80
+    c.CWindowRows = 24
+
+    c.CDoToWillCmdList = make(map[byte] func(*GoTel, byte) bool)
+    c.CWillToDoCmdList = make(map[byte] func(*GoTel, byte) bool)
+    c.CSubCmdListeners = make(map[byte] func(*GoTel, byte, []byte) bool)
+
+    c.CWillToDoCmdList[ECHO] = nil
+    c.CWillToDoCmdList[SGA] = nil
+    c.CDoToWillCmdList[TT] = nil
+    c.CDoToWillCmdList[NAWS] = func(g *GoTel, code byte) bool {
+        c1 := byte(g.Config.CWindowCols / 256)
+        c2 := byte(g.Config.CWindowCols % 256)
+        r1 := byte(g.Config.CWindowRows / 256)
+        r2 := byte(g.Config.CWindowRows % 256)
+        g.SendCommand(IAC, SB, NAWS, c1, c2, r1, r2, IAC, SE)
+        return true
+    }
+    
+    c.RegisterSubCmdListener(TT, func(g *GoTel, code byte, content []byte) bool {
+        cmd := []byte {IAC, SB, TT, IS}
+        cmd = append(cmd, g.Config.CTerminalType...)
+        cmd = append(cmd, IAC, SE)
+        g.SendCommand(cmd...)
+        return true
+    })
+    return c
+}
+
 // GoTel comment
 type GoTel struct {
     // public
@@ -105,8 +140,7 @@ type GoTel struct {
 // New new GoTelnet implemention
 func New(rw io.ReadWriter) *GoTel {
     t := GoTel{}
-    t.Config = TelConfig{}
-    t.UseDefaultConfig()
+    t.Config = GetGoTelDefaultConfig()
     
     t.state = stateData
     t.rw = rw
@@ -114,39 +148,6 @@ func New(rw io.ReadWriter) *GoTel {
     t.subData = make([]byte, 0, 32)
     t.err = nil
     return &t
-}
-
-// UseDefaultConfig comment
-func (t *GoTel) UseDefaultConfig() {
-    t.Config.CReadBuffer = 1024
-    t.Config.CLogLevel = LogDebug
-    t.Config.CTerminalType = "VT100"
-    t.Config.CWindowCols = 80
-    t.Config.CWindowRows = 24
-    
-    t.Config.CDoToWillCmdList = make(map[byte] func(*GoTel, byte) bool)
-    t.Config.CWillToDoCmdList = make(map[byte] func(*GoTel, byte) bool)
-    t.Config.CSubCmdListeners = make(map[byte] func(*GoTel, byte, []byte) bool)
-    
-    t.Config.CWillToDoCmdList[ECHO] = nil
-    t.Config.CWillToDoCmdList[SGA] = nil
-    t.Config.CDoToWillCmdList[TT] = nil
-    t.Config.CDoToWillCmdList[NAWS] = func(g *GoTel, code byte) bool {
-        c1 := byte(g.Config.CWindowCols / 256)
-        c2 := byte(g.Config.CWindowCols % 256)
-        r1 := byte(g.Config.CWindowRows / 256)
-        r2 := byte(g.Config.CWindowRows % 256)
-        g.SendCommand(IAC, SB, NAWS, c1, c2, r1, r2, IAC, SE)
-        return true
-    }
-    
-    t.Config.RegisterSubCmdListener(TT, func(g *GoTel, code byte, content []byte) bool {
-        cmd := []byte {IAC, SB, TT, IS}
-        cmd = append(cmd, g.Config.CTerminalType...)
-        cmd = append(cmd, IAC, SE)
-        g.SendCommand(cmd...)
-        return true
-    })
 }
 
 func (t *GoTel) Read(p []byte) (int, error) {
