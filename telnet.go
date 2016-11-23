@@ -50,8 +50,8 @@ const (
     IS byte = '\x00'
     // SEND comment
     SEND byte = '\x01'
-    // WS Window size
-    WS byte = '\x1f'
+    // NAWS Negotiate about window size
+    NAWS byte = '\x1f'
 )
 
 type telState int
@@ -71,6 +71,8 @@ type TelConfig struct {
     CReadBuffer int
     CLogLevel LogLevel
     CTerminalType string
+    CWindowCols int
+    CWindowRows int
     CDoToWillCmdList map[byte] func(*GoTel, byte) bool
     CWillToDoCmdList map[byte] func(*GoTel, byte) bool
     CSubCmdListeners map[byte] func(*GoTel, byte, []byte) bool
@@ -119,6 +121,8 @@ func (t *GoTel) UseDefaultConfig() {
     t.Config.CReadBuffer = 1024
     t.Config.CLogLevel = LogDebug
     t.Config.CTerminalType = "VT100"
+    t.Config.CWindowCols = 80
+    t.Config.CWindowRows = 24
     
     t.Config.CDoToWillCmdList = make(map[byte] func(*GoTel, byte) bool)
     t.Config.CWillToDoCmdList = make(map[byte] func(*GoTel, byte) bool)
@@ -127,12 +131,19 @@ func (t *GoTel) UseDefaultConfig() {
     t.Config.CWillToDoCmdList[ECHO] = nil
     t.Config.CWillToDoCmdList[SGA] = nil
     t.Config.CDoToWillCmdList[TT] = nil
-    t.Config.CDoToWillCmdList[WS] = nil // TODO check window size
+    t.Config.CDoToWillCmdList[NAWS] = func(g *GoTel, code byte) bool {
+        c1 := byte(g.Config.CWindowCols / 256)
+        c2 := byte(g.Config.CWindowCols % 256)
+        r1 := byte(g.Config.CWindowRows / 256)
+        r2 := byte(g.Config.CWindowRows % 256)
+        g.SendCommand(IAC, SB, NAWS, c1, c2, r1, r2, IAC, SE)
+        return true
+    }
     
     t.Config.RegisterSubCmdListener(TT, func(g *GoTel, code byte, content []byte) bool {
         cmd := []byte {IAC, SB, TT, IS}
         cmd = append(cmd, g.Config.CTerminalType...)
-        cmd = append(cmd, IAC, SB)
+        cmd = append(cmd, IAC, SE)
         g.SendCommand(cmd...)
         return true
     })
