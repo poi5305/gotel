@@ -139,9 +139,14 @@ type GoTel struct {
 
 // New new GoTelnet implemention
 func New(rw io.ReadWriter) *GoTel {
+    return NewWithConfig(rw, GetGoTelDefaultConfig())
+}
+
+// NewWithConfig new GoTelnet with config
+func NewWithConfig(rw io.ReadWriter, c TelConfig) *GoTel{
     t := GoTel{}
-    t.Config = GetGoTelDefaultConfig()
-    
+    t.Config = c
+
     t.state = stateData
     t.rw = rw
     t.dataBuf = bytes.NewBuffer(make([]byte, 0, t.Config.CReadBuffer))
