@@ -272,7 +272,7 @@ func (t *GoTel) inStateDo(b byte) telState {
             }
         }
     }
-    t.SendCommand(IAC, DONT, b)
+    t.SendCommand(IAC, WONT, b)
     return stateData
 }
 
