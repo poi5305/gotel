@@ -3,11 +3,13 @@ package gotel
 import(
     "io"
     "bytes"
+    "fmt"
+    "log"
 )
 
 const (
-    // NULL null 
-    NULL byte = '\x00'
+    // BX Allows transmission of binary data
+    BX byte = '\x00'
     // SE End of subnegotiation parameters
     SE byte = '\xf0'
     // NOP No operation
@@ -166,8 +168,10 @@ func (t *GoTel) Read(p []byte) (int, error) {
         for i := 0; i < n; i++ {
             t.addByte(b[i])
         }
+        t.log(LogDebug, "Receive raw length", n)
     }
     n, err := t.dataBuf.Read(p)
+    t.log(LogDebug, "Receive data length", n)
     t.err = err
     return n, err
 }
@@ -178,13 +182,8 @@ func (t *GoTel) Write(p []byte) (int, error) {
 
 // SendCommand comment
 func (t *GoTel) SendCommand(codes... byte) {
-    cmd := make([]byte, len(codes) + 1)
-    cmd[0] = byte(IAC)
-
-	for i, code := range codes {
-		cmd[i + 1] = code
-	}
-	t.rw.Write(cmd)
+    t.logCodes(LogDebug, "Send", codes...)
+	t.rw.Write(codes)
 }
 
 func (t *GoTel) addByte(b byte) {
@@ -248,6 +247,7 @@ func (t *GoTel) inStateSB(b byte) telState {
 }
 
 func (t *GoTel) inStateWill(b byte) telState {
+    t.log(LogDebug, "Receive Will", Code2Str(b))
     if t.Config.CWillToDoCmdList != nil {
         do, ok := t.Config.CWillToDoCmdList[b]
         if ok {
@@ -262,6 +262,7 @@ func (t *GoTel) inStateWill(b byte) telState {
 }
 
 func (t *GoTel) inStateDo(b byte) telState {
+    t.log(LogDebug, "Receive Do", Code2Str(b))
     if t.Config.CDoToWillCmdList != nil {
         do, ok := t.Config.CDoToWillCmdList[b]
         if ok {
@@ -276,18 +277,85 @@ func (t *GoTel) inStateDo(b byte) telState {
 }
 
 func (t *GoTel) inStateWont(b byte) telState {
+    t.log(LogDebug, "Receive Won't", Code2Str(b))
     return stateData
 }
 
 func (t *GoTel) inStateDont(b byte) telState {
+    t.log(LogDebug, "Receive Don't", Code2Str(b))
     return stateData
 }
 
 func (t *GoTel) subCommand(code byte, content []byte) {
+    t.logCodes(LogDebug, "Receive sub command " + Code2Str(code), content...)
     if t.Config.CSubCmdListeners != nil {
         listener, ok := t.Config.CSubCmdListeners[code]
         if ok {
             listener(t, code, content)
         }
+    }
+}
+
+// Code2Str Convert byte code to string
+func Code2Str(code byte) string {
+    switch code {
+    case BX:
+        return "BX"
+    case SE:
+        return "SE"
+    case NOP:
+        return "NOP"
+    case DM:
+        return "DM"
+    case BRK:
+        return "BRK"
+    case IP:
+        return "IP"
+    case AO:
+        return "AO"
+    case AYT:
+        return "AYT"
+    case EC:
+        return "EC"
+    case EL:
+        return "EL"
+    case GA:
+        return "GA"
+    case SB:
+        return "SB"
+    case ECHO:
+        return "ECHO"
+    case SGA:
+        return "SGA"
+    case IAC:
+		return "IAC"
+    case TT:
+        return "TT"
+    case NAWS:
+        return "NAWS"
+    case WILL:
+        return "WILL"
+    case WONT:
+        return "WONT"
+    case DO:
+        return "DO"
+    case DONT:
+        return "DONT"
+    }
+    return fmt.Sprint(code)
+}
+
+func (t *GoTel) logCodes(l LogLevel, msg string, code ...byte) {
+    if l <= t.Config.CLogLevel {
+        for _, c := range code {
+            msg += " " + Code2Str(c)
+        }
+        t.log(l, msg)
+    }
+}
+
+func (t *GoTel) log(l LogLevel, msg ...interface{}) {
+    if l <= t.Config.CLogLevel {
+        log.Println(msg)
     }
 }
