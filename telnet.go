@@ -93,8 +93,8 @@ func (t *TelConfig) UnregisterSubCmdListener(code byte) {
 // GetGoTelDefaultConfig comment
 func GetGoTelDefaultConfig() TelConfig {
     c := TelConfig{}
-    c.CReadBuffer = 1024
-    c.CLogLevel = LogDebug
+    c.CReadBuffer = 2048
+    c.CLogLevel = LogWarning
     c.CTerminalType = "VT100"
     c.CWindowCols = 80
     c.CWindowRows = 24
@@ -167,6 +167,7 @@ func (t *GoTel) Read(p []byte) (int, error) {
         }
         for i := 0; i < n; i++ {
             t.addByte(b[i])
+            fmt.Print(b[i])
         }
         t.log(LogDebug, "Receive raw length", n)
     }
