@@ -1,5 +1,9 @@
 package gotel
 
+import(
+    "log"
+)
+
 // ForeColor Text foreground color
 const ForeColor int = 30
 // BackColor Text background color
@@ -64,12 +68,27 @@ type AnsiState uint8
 const (
     // StateText In text state
     StateText AnsiState = 0
+
     // StateESC In ESC state
     StateESC AnsiState = 1
-    // StateC1 In C1 state
-    StateC1 AnsiState = 2
-    // StateCSI In CSI state
-    StateCSI AnsiState = 3
+
+    // StateC0 In C0 state, 2 char cmd, 00 ~ 1F
+    // StateC0 AnsiState = 2
+
+    // StateIntermediate In Intermediate state, 3 char cmd, 20 ~ 2F
+    StateIntermediate AnsiState = 2
+    
+    // StateParameter In Parameter state, 2 char cmd, 30 ~ 3F
+    // StateParameter AnsiState = 3
+
+    // StateC1 In C1 state (Uppercase), 2 char cmd, 40 ~ 5F (CSI special)
+    // StateC1 AnsiState = 4
+
+    // StateLowercase In Alphabetic state, 2 char cmd, 60 ~ 7E
+    // StateLowercase AnsiState = 5
+
+    // StateCSI In CSI state, n char cmd, 1B
+    StateCSI AnsiState = 6
 )
 
 // AnsiCommand ANSI Command
@@ -104,6 +123,25 @@ func (a *AnsiParser) AddByte(b byte) (AnsiProperty, AnsiCommand) {
         default:
             
         }
+    case StateESC:
+        switch {
+        case b == 0x1B || b == 0x9B: // CSI state (n char)
+            a.state = StateCSI
+        case b >= 0x00 && b <= 0x1F: // C0 state (2 char)
+            a.state = StateText
+        case b >= 0x20 && b <= 0x2F: // Intermediate state (3 or more char)
+            a.state = StateIntermediate
+        case b >= 0x30 && b <= 0x3F: // Parameter state (2 char)
+            a.state = StateText
+        case b >= 0x40 && b <= 0x5F: // C1 state (2 char)
+            a.state = StateText
+        case b >= 0x60 && b <= 0x7E: // Lowercase state (2 char)
+            a.state = StateText
+        case b >= 0x80 && b <= 0x9F: // C1 state (2 char)
+            a.state = StateText
+        }
+    case StateIntermediate:
+    case StateCSI:
     }
     
     
