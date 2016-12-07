@@ -156,19 +156,26 @@ func (a *AnsiParser) AddByte(b byte) AnsiCommand {
         }
     case StateIntermediate:
         a.tempCommand = append(a.tempCommand, b)
-        if len(a.tempCommand) == 2 {
+        if len(a.tempCommand) == 2 { // TODO b >= 0x30 && b <= 0x7E or b == 0x20 ?
             a.ansiCmd = a.CommandIntermediate(a.tempCommand[0], a.tempCommand[1])
             a.tempCommand = a.tempCommand[:0]
             a.state = StateText
         }
     case StateCSI:
+        if b >= 0x40 && b <= 0x7E {
+            // CSI command finish
+            a.ansiCmd = a.CommandCSI(a.tempCommand, b)
+            a.tempCommand = a.tempCommand[:0]
+            a.state = StateText
+        } else {
+            a.tempCommand = append(a.tempCommand, b)
+        }
     }
-    
     return a.ansiCmd
 }
 
 // CommandCSI comment
-func (a *AnsiParser) CommandCSI(bs []byte) AnsiCommand {
+func (a *AnsiParser) CommandCSI(param []byte, cmd byte) AnsiCommand {
 
 }
 
