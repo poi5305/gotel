@@ -94,56 +94,106 @@ const (
 // AnsiCommand ANSI Command
 type AnsiCommand uint8
 const (
-    
+    // CmdText This byte is text
+    CmdText AnsiCommand = 0
+    // CmdParsing This byte is do nothing
+    CmdParsing AnsiCommand = 1
 )
 
 // AnsiParser comment
 type AnsiParser struct {
+    ansiCmd AnsiCommand
     state AnsiState
     property AnsiProperty
+    tempCommand []byte
 }
 
 // NewAnsiParser Create new ANSI parser
 func NewAnsiParser() *AnsiParser {
     a := AnsiParser {
+        CmdText,
         StateText,
         AnsiProperty{},
+        make([]byte, 0, 16),
     }
     return &a
 }
 
 // AddByte Add a byte
-func (a *AnsiParser) AddByte(b byte) (AnsiProperty, AnsiCommand) {
-    
+func (a *AnsiParser) AddByte(b byte) AnsiCommand {
     switch a.state {
     case StateText:
         switch b {
         case 27: // esc
             a.state = StateESC
+            a.ansiCmd = CmdParsing
         default:
-            
+            a.ansiCmd = CmdText
         }
     case StateESC:
         switch {
         case b == 0x1B || b == 0x9B: // CSI state (n char)
             a.state = StateCSI
+            a.ansiCmd = CmdParsing
         case b >= 0x00 && b <= 0x1F: // C0 state (2 char)
             a.state = StateText
-        case b >= 0x20 && b <= 0x2F: // Intermediate state (3 or more char)
+            a.ansiCmd = a.CommandC0(b)
+        case b >= 0x20 && b <= 0x2F: // Intermediate state (only support 3 word now)
             a.state = StateIntermediate
+            a.ansiCmd = CmdParsing
         case b >= 0x30 && b <= 0x3F: // Parameter state (2 char)
             a.state = StateText
+            a.ansiCmd = a.CommandParameter(b)
         case b >= 0x40 && b <= 0x5F: // C1 state (2 char)
             a.state = StateText
+            a.ansiCmd = a.CommandC1(b)
         case b >= 0x60 && b <= 0x7E: // Lowercase state (2 char)
             a.state = StateText
+            a.ansiCmd = a.CommandLowercase(b)
         case b >= 0x80 && b <= 0x9F: // C1 state (2 char)
             a.state = StateText
+            a.ansiCmd = a.CommandC1(b)
         }
     case StateIntermediate:
+        a.tempCommand = append(a.tempCommand, b)
+        if len(a.tempCommand) == 2 {
+            a.ansiCmd = a.CommandIntermediate(a.tempCommand[0], a.tempCommand[1])
+            a.tempCommand = a.tempCommand[:0]
+            a.state = StateText
+        }
     case StateCSI:
     }
     
+    return a.ansiCmd
+}
+
+// CommandCSI comment
+func (a *AnsiParser) CommandCSI(bs []byte) AnsiCommand {
+
+}
+
+// CommandC0 comment
+func (a *AnsiParser) CommandC0(b byte) AnsiCommand {
+    
+}
+
+// CommandIntermediate Only support 3 char command
+func (a *AnsiParser) CommandIntermediate(b1 byte, b2 byte) AnsiCommand {
+    
+}
+
+// CommandParameter comment
+func (a *AnsiParser) CommandParameter(b byte) AnsiCommand {
+    
+}
+
+// CommandC1 comment
+func (a *AnsiParser) CommandC1(b byte) AnsiCommand {
+    
+}
+
+// CommandLowercase comment
+func (a *AnsiParser) CommandLowercase(b byte) AnsiCommand {
     
 }
 
